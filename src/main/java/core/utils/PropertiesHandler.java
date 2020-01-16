@@ -1,10 +1,13 @@
 package core.utils;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
 import java.util.*;
+
+import org.apache.commons.lang3.StringUtils;
 
 public class PropertiesHandler {
 
@@ -24,11 +27,19 @@ public class PropertiesHandler {
     }
 
     private PropertiesHandler() {
+    	String propertiesPath = PROPS_PATH;
+    	
+    	String dataPath = System.getenv("DATA_PATH");
+    	
+    	if(StringUtils.isNotBlank(dataPath)) {
+    		propertiesPath = new File(dataPath, PROPS_PATH).getAbsolutePath();
+    	}
+    	
         System.out.println(PROPS_PATH);
         listeners = new HashSet<PropertiesListener>();
         prop = new Properties();
         try {
-            InputStream input = new FileInputStream(PROPS_PATH);
+            InputStream input = new FileInputStream(propertiesPath);
             prop = new Properties();
             prop.load(input);
         } catch (IOException ex) {
