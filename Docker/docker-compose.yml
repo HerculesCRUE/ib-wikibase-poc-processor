@@ -1,0 +1,208 @@
+# Wikibase with Query Service
+#
+# This docker-compose example can be used to pull the images from docker hub.
+#
+# Examples:
+#
+# Access Wikibase via "http://localhost:8181"
+#   (or "http://$(docker-machine ip):8181" if using docker-machine)
+#
+# Access Query Service via "http://localhost:8282"
+#   (or "http://$(docker-machine ip):8282" if using docker-machine)
+version: '3'
+
+services:
+  wikibase:
+    image: wikibase/wikibase:1.33-bundle
+    links:
+      - mysql
+    ports:
+      # CONFIG - Change the 8181 here to expose Wikibase & MediaWiki on a different port
+      - "8181:80"
+    volumes:
+      - mediawiki-images-data:/var/www/html/images
+      - quickstatements-data:/quickstatements/data
+    depends_on:
+      - mysql
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - wikibase.svc
+          # CONFIG - Add your real wikibase hostname here, for example wikibase-registry.wmflabs.org
+    environment:
+      - DB_SERVER=mysql.svc:3306
+      - MW_ELASTIC_HOST=elasticsearch.svc
+      - MW_ELASTIC_PORT=9200
+      # CONFIG - Change the default values below
+      - MW_ADMIN_NAME=WikibaseAdmin
+      - MW_ADMIN_PASS=WikibaseDockerAdminPass
+      - MW_ADMIN_EMAIL=admin@example.com
+      - MW_WG_SECRET_KEY=secretkey
+      # CONFIG - Change the default values below (should match mysql values in this file)
+      - DB_USER=wikiuser
+      - DB_PASS=sqlpass
+      - DB_NAME=my_wiki
+      - QS_PUBLIC_SCHEME_HOST_AND_PORT=http://localhost:9191
+  mysql:
+    image: mariadb:10.3
+    restart: unless-stopped
+    volumes:
+      - mediawiki-mysql-data:/var/lib/mysql
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+      # CONFIG - Change the default values below (should match values passed to wikibase)
+      MYSQL_DATABASE: 'my_wiki'
+      MYSQL_USER: 'wikiuser'
+      MYSQL_PASSWORD: 'sqlpass'
+    networks:
+      default:
+        aliases:
+          - mysql.svc
+  wdqs-frontend:
+    image: wikibase/wdqs-frontend:latest
+    restart: unless-stopped
+    ports:
+      # CONFIG - Change the 8282 here to expose the Query Service UI on a different port
+      - "8282:80"
+    depends_on:
+      - wdqs-proxy
+    networks:
+      default:
+        aliases:
+          - wdqs-frontend.svc
+    environment:
+      - WIKIBASE_HOST=wikibase.svc
+      - WDQS_HOST=wdqs-proxy.svc
+  wdqs:
+    image: wikibase/wdqs:0.3.10
+    restart: unless-stopped
+    volumes:
+      - query-service-data:/wdqs/data
+    command: /runBlazegraph.sh
+    networks:
+      default:
+        aliases:
+          - wdqs.svc
+    environment:
+      - WIKIBASE_HOST=wikibase.svc
+      - WDQS_HOST=wdqs.svc
+      - WDQS_PORT=9999
+    expose:
+      - 9999
+  wdqs-proxy:
+    image: wikibase/wdqs-proxy
+    restart: unless-stopped
+    environment:
+      - PROXY_PASS_HOST=wdqs.svc:9999
+    ports:
+      - "8989:80"
+    depends_on:
+      - wdqs
+    networks:
+      default:
+        aliases:
+          - wdqs-proxy.svc
+  wdqs-updater:
+    image: wikibase/wdqs:0.3.10
+    restart: unless-stopped
+    command: /runUpdate.sh
+    depends_on:
+      - wdqs
+      - wikibase
+    networks:
+      default:
+        aliases:
+          - wdqs-updater.svc
+    environment:
+      - WIKIBASE_HOST=wikibase.svc
+      - WDQS_HOST=wdqs.svc
+      - WDQS_PORT=9999
+  elasticsearch:
+    image: wikibase/elasticsearch:5.6.14-extra # wikibase/elasticsearch:5.6.14-extra
+    restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - elasticsearch.svc
+    environment:
+      'http.host': '0.0.0.0'
+      'transport.host': 'localhost'
+      'network.host': '0.0.0.0'
+      'discovery.type': 'single-node'
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+  # CONFING, in order to not load quickstatements then remove this entire section
+  quickstatements:
+    image: wikibase/quickstatements:latest
+    ports:
+      - "9191:80"
+    depends_on:
+      - wikibase
+    volumes:
+      - quickstatements-data:/quickstatements/data
+    networks:
+      default:
+        aliases:
+          - quickstatements.svc
+    environment:
+      - QS_PUBLIC_SCHEME_HOST_AND_PORT=http://localhost:9191
+      - WB_PUBLIC_SCHEME_HOST_AND_PORT=http://localhost:8181
+      - WIKIBASE_SCHEME_AND_HOST=http://wikibase.svc
+      - WB_PROPERTY_NAMESPACE=122
+      - "WB_PROPERTY_PREFIX=Property:"
+      - WB_ITEM_NAMESPACE=120
+      - "WB_ITEM_PREFIX=Item:"
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+  kafka:
+    build: .
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    volumes:
+        - kafka-data:/var/run/docker.sock
+  #Graylog Block
+    # MongoDB: https://hub.docker.com/_/mongo/
+  mongodb:
+    image: mongo:3
+    # Elasticsearch: https://www.elastic.co/guide/en/elasticsearch/reference/6.x/docker.html
+  graylog:
+    image: graylog/graylog:3.1
+    environment:
+      GRAYLOG_PASSWORD_SECRET: somepasswordpepper
+      GRAYLOG_ROOT_PASSWORD_SHA2: 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      GRAYLOG_HTTP_EXTERNAL_URI: http://127.0.0.1:9000/
+    links:
+      - mongodb:mongo
+      - elasticsearch
+    depends_on:
+      - mongodb
+      - elasticsearch
+    ports:
+      # Graylog web interface and REST API
+      - 9000:9000
+      # Syslog TCP
+      - 1514:1514
+      # Syslog UDP
+      - 1514:1514/udp
+      # GELF TCP
+      - 12201:12201
+      # GELF UDP
+      - 12201:12201/udp
+volumes:
+  mediawiki-mysql-data:
+  mediawiki-images-data:
+  query-service-data:
+  quickstatements-data:
+  kafka-data:
