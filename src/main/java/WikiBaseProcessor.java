@@ -65,8 +65,14 @@ public class WikiBaseProcessor {
                 String type = jMessage.get("type").getAsString();
                 JsonObject jData = jMessage.get("data").getAsJsonObject();
                 System.out.println("recived TYPE: ["+type+"]\tID: ["+id+"]\tCONTENT: "+jData.toString());
+                
+                System.out.println("Ready to update wikidata");
                 handleWikidataUpdate(jData);
+                
+                System.out.println("Wikidata updated");
                 kh.sendMessage("success-queue","success-queue",message);
+                
+                System.out.println("Message sended to success queue");
             }
         });
 
