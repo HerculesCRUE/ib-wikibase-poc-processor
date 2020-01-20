@@ -67,12 +67,16 @@ public class WikiBaseProcessor {
                 System.out.println("recived TYPE: ["+type+"]\tID: ["+id+"]\tCONTENT: "+jData.toString());
                 
                 System.out.println("Ready to update wikidata");
-                handleWikidataUpdate(jData);
-                
-                System.out.println("Wikidata updated");
-                kh.sendMessage("success-queue","success-queue",message);
-                
-                System.out.println("Message sended to success queue");
+                try {
+                	handleWikidataUpdate(jData);
+                	
+                	System.out.println("Wikidata updated");
+                    kh.sendMessage("success-queue","success-queue",message);
+                    
+                    System.out.println("Message sended to success queue");
+                } catch(Exception e) {
+                	e.printStackTrace();
+                }
             }
         });
 
@@ -108,6 +112,7 @@ public class WikiBaseProcessor {
                     break;
                 }
             }
+            
             if (insertedItem!=null) {
                 for (Map.Entry<String, JsonElement> att:jData.entrySet()) {
                     String key = att.getKey();
@@ -134,8 +139,9 @@ public class WikiBaseProcessor {
                             } else {
                                 statement = wbhi.generateStatement(insertedItem.getEntityId(),pd.getEntityId(), Datamodel.makeStringValue(value));
                             }
-                            if (statement!=null)
+                            if (statement!=null) {
                                 insertedItem = wbhi.updateStatementInItem(insertedItem,statement,ENTITIES_SITE_URI);
+                            }
                         }
                     }
                 }
