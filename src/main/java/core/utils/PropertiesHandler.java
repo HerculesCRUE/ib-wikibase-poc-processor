@@ -32,7 +32,7 @@ public class PropertiesHandler {
     	String dataPath = System.getenv("DATA_PATH");
     	
     	if(StringUtils.isNotBlank(dataPath)) {
-    		propertiesPath = new File(dataPath, PROPS_PATH).getAbsolutePath();
+    		propertiesPath = new File(dataPath, "config.properties").getAbsolutePath();
     	}
     	
         System.out.println(PROPS_PATH);
