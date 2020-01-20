@@ -43,6 +43,11 @@ public class WikibaseHandlerImpl {
         if (connection == null || !connection.isLoggedIn()) {
             String user = (String) config.getValue("wikibase.username");
             String password = (String) config.getValue("wikibase.password");
+            
+            System.out.println("URL -> " + apiUrl);
+            System.out.println("USER -> " + user);
+            System.out.println("PWD -> " + password);
+            
             WebResourceFetcherImpl
                     .setUserAgent(this.getClass().getName());
             connection = new ApiConnection(apiUrl);
